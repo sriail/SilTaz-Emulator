@@ -35,6 +35,8 @@ SliTaz includes many useful applications out of the box:
 
 ## 🚀 Quick Start
 
+> **New to this?** Check out [QUICKSTART.md](QUICKSTART.md) for a beginner-friendly guide!
+
 ### Option 1: Local Testing (Recommended for Development)
 
 1. **Clone the repository**:
