@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SliTaz Browser VM - Powered by v86</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.running {
+            background: #44ff44;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ff4444;
+            color: white;
+        }
+
+        .btn-success {
+            background: #44ff44;
+            color: #333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            padding: 20px 30px;
+        }
+
+        .vm-display {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        #screen_container {
+            background: #000;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #screen_container canvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 10;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-container {
+            width: 300px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+
+        .terminal {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .terminal-line {
+            margin-bottom: 5px;
+        }
+
+        .terminal-line.error {
+            color: #ff4444;
+        }
+
+        .terminal-line.success {
+            color: #44ff44;
+        }
+
+        .terminal-line.info {
+            color: #44aaff;
+        }
+
+        .settings-panel {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .settings-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+
+        .setting-row label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        input[type="range"] {
+            width: 200px;
+        }
+
+        .file-operations {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+
+        .file-operations h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 1000;
+            display: none;
+        }
+
+        .fullscreen-overlay.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fullscreen-controls {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fullscreen-screen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                justify-content: center;
+            }
+
+            .header {
+                text-align: center;
+                flex-direction: column;
+            }
+
+            input[type="range"] {
+                width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🖥️ SliTaz Browser VM</h1>
+                <p>Powered by v86 - Full Linux in Your Browser</p>
+            </div>
+            <div class="status">
+                <div class="status-indicator" id="status-indicator"></div>
+                <span id="status-text">Stopped</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="btn-start" onclick="startVM()">
+                ▶️ Start VM
+            </button>
+            <button class="btn btn-danger" id="btn-stop" onclick="stopVM()" disabled>
+                ⏹️ Stop VM
+            </button>
+            <button class="btn btn-secondary" id="btn-restart" onclick="restartVM()" disabled>
+                🔄 Restart VM
+            </button>
+            <button class="btn btn-success" id="btn-save" onclick="saveState()" disabled>
+                💾 Save State
+            </button>
+            <button class="btn btn-info" id="btn-fullscreen" onclick="toggleFullscreen()">
+                🖼️ Fullscreen
+            </button>
+            <button class="btn btn-secondary" id="btn-keyboard" onclick="toggleKeyboard()">
+                ⌨️ Grab Keyboard
+            </button>
+        </div>
+
+        <div class="main-content">
+            <div class="vm-display">
+                <div id="screen_container">
+                    <div class="loading-overlay active" id="loading-overlay">
+                        <div class="spinner"></div>
+                        <div id="loading-text">Click "Start VM" to begin</div>
+                        <div class="progress-container" id="progress-container" style="display: none;">
+                            <div class="progress-bar" id="progress-bar">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="file-operations">
+                <h4>📁 File Operations</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="file-input" onchange="importFile()" multiple>
+                        <button class="btn btn-info" onclick="document.getElementById('file-input').click()">
+                            📤 Import File to VM
+                        </button>
+                    </div>
+                    <button class="btn btn-info" id="btn-export" onclick="exportFile()" disabled>
+                        📥 Export File from VM
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-panel">
+                <h3>⚙️ Settings</h3>
+                <div class="setting-row">
+                    <label for="memory-slider">Memory Allocation</label>
+                    <div>
+                        <input type="range" id="memory-slider" min="128" max="512" value="256" step="64" 
+                               onchange="updateMemoryDisplay()">
+                        <span id="memory-display">256 MB</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label for="network-toggle">Enable Network</label>
+                    <input type="checkbox" id="network-toggle" checked>
+                </div>
+                <div class="setting-row">
+                    <label>Cache Management</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="clearCache()">🗑️ Clear Cache</button>
+                        <button class="btn btn-info" onclick="showCacheInfo()">ℹ️ Cache Info</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label for="autosave-toggle">Auto-Save (30s)</label>
+                    <input type="checkbox" id="autosave-toggle" checked>
+                </div>
+            </div>
+
+            <div class="terminal" id="terminal">
+                <div class="terminal-line info">🖥️ SliTaz VM Console - Ready</div>
+                <div class="terminal-line">System: Waiting for VM to start...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fullscreen-overlay" id="fullscreen-overlay">
+        <div class="fullscreen-controls">
+            <span style="color: white; font-weight: bold;">SliTaz VM - Fullscreen Mode</span>
+            <button class="btn btn-secondary" onclick="toggleFullscreen()">Exit Fullscreen</button>
+        </div>
+        <div class="fullscreen-screen" id="fullscreen-screen"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/v86@latest/build/libv86.js"></script>
+    <script>
+        let emulator = null;
+        let autoSaveInterval = null;
+        let keyboardGrabbed = false;
+        const DB_NAME = 'SliTazVM';
+        const DB_VERSION = 1;
+        const ISO_URL = 'http://mirror.slitaz.org/iso/rolling/slitaz-rolling.iso';
+        
+        // IndexedDB setup
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    
+                    if (!db.objectStoreNames.contains('osFiles')) {
+                        db.createObjectStore('osFiles', { keyPath: 'name' });
+                    }
+                    
+                    if (!db.objectStoreNames.contains('diskState')) {
+                        db.createObjectStore('diskState', { keyPath: 'name' });
+                    }
+                };
+            });
+        }
+
+        async function getCachedISO() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['osFiles'], 'readonly');
+                const store = transaction.objectStore('osFiles');
+                const request = store.get('slitaz.iso');
+                
+                request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function cacheISO(data) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['osFiles'], 'readwrite');
+                const store = transaction.objectStore('osFiles');
+                const request = store.put({ name: 'slitaz.iso', data: data });
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getDiskState() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['diskState'], 'readonly');
+                const store = transaction.objectStore('diskState');
+                const request = store.get('hda.img');
+                
+                request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function saveDiskState(data) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['diskState'], 'readwrite');
+                const store = transaction.objectStore('diskState');
+                const request = store.put({ name: 'hda.img', data: data });
+                
+                request.onsuccess = () => {
+                    log('Disk state saved to IndexedDB', 'success');
+                    resolve();
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function fetchISO() {
+            log('Checking for cached ISO...', 'info');
+            let isoData = await getCachedISO();
+            
+            if (isoData) {
+                log('Loading ISO from cache (fast boot!)', 'success');
+                return isoData;
+            }
+            
+            log('Downloading SliTaz ISO (first time only, ~40MB)...', 'info');
+            showProgress();
+            
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', ISO_URL, true);
+                xhr.responseType = 'arraybuffer';
+                
+                xhr.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total * 100).toFixed(1);
+                        updateProgress(percent);
+                    }
+                };
+                
+                xhr.onload = async () => {
+                    if (xhr.status === 200) {
+                        hideProgress();
+                        log('ISO downloaded successfully, caching...', 'success');
+                        const arrayBuffer = xhr.response;
+                        await cacheISO(arrayBuffer);
+                        log('ISO cached for future use', 'success');
+                        resolve(arrayBuffer);
+                    } else {
+                        hideProgress();
+                        reject(new Error(`Failed to download ISO: ${xhr.status}`));
+                    }
+                };
+                
+                xhr.onerror = () => {
+                    hideProgress();
+                    reject(new Error('Network error while downloading ISO'));
+                };
+                
+                xhr.send();
+            });
+        }
+
+        async function startVM() {
+            if (emulator) {
+                log('VM is already running', 'error');
+                return;
+            }
+
+            try {
+                updateStatus('Starting', false);
+                log('Initializing VM...', 'info');
+                document.getElementById('loading-text').textContent = 'Initializing...';
+                document.getElementById('loading-overlay').classList.add('active');
+                
+                const isoBuffer = await fetchISO();
+                log('ISO loaded, starting emulator...', 'info');
+                document.getElementById('loading-text').textContent = 'Booting SliTaz...';
+                
+                const memory = parseInt(document.getElementById('memory-slider').value);
+                const networkEnabled = document.getElementById('network-toggle').checked;
+                
+                const config = {
+                    wasm_path: "https://cdn.jsdelivr.net/npm/v86@latest/build/v86.wasm",
+                    memory_size: memory * 1024 * 1024,
+                    vga_memory_size: 8 * 1024 * 1024,
+                    screen_container: document.getElementById("screen_container"),
+                    bios: {
+                        url: "https://cdn.jsdelivr.net/npm/v86@latest/bios/seabios.bin"
+                    },
+                    vga_bios: {
+                        url: "https://cdn.jsdelivr.net/npm/v86@latest/bios/vgabios.bin"
+                    },
+                    cdrom: {
+                        buffer: isoBuffer
+                    },
+                    autostart: true,
+                    boot_order: 0x123 // CD, HDD, Floppy
+                };
+
+                // Add network configuration if enabled
+                if (networkEnabled) {
+                    config.network_relay_url = "wss://relay.widgetry.org/";
+                    log('Network enabled via relay', 'info');
+                }
+
+                // Try to load saved disk state
+                const diskState = await getDiskState();
+                if (diskState) {
+                    log('Loading saved disk state...', 'success');
+                    config.hda = {
+                        buffer: diskState,
+                        async: true,
+                        size: 512 * 1024 * 1024
+                    };
+                } else {
+                    log('Creating new virtual disk (512MB)...', 'info');
+                    config.hda = {
+                        size: 512 * 1024 * 1024,
+                        async: true
+                    };
+                }
+                
+                emulator = new V86Starter(config);
+                
+                emulator.add_listener("emulator-ready", () => {
+                    log('Emulator ready!', 'success');
+                    document.getElementById('loading-overlay').classList.remove('active');
+                    updateStatus('Running', true);
+                    enableControls();
+                    startAutoSave();
+                });
+
+                emulator.add_listener("serial0-output-char", (char) => {
+                    // Handle serial output if needed
+                });
+
+            } catch (error) {
+                log(`Error starting VM: ${error.message}`, 'error');
+                document.getElementById('loading-overlay').classList.remove('active');
+                updateStatus('Error', false);
+                console.error(error);
+            }
+        }
+
+        async function stopVM() {
+            if (!emulator) return;
+            
+            log('Stopping VM...', 'info');
+            
+            try {
+                await saveState();
+                emulator.stop();
+                emulator.destroy();
+                emulator = null;
+                
+                stopAutoSave();
+                updateStatus('Stopped', false);
+                disableControls();
+                document.getElementById('loading-overlay').classList.add('active');
+                document.getElementById('loading-text').textContent = 'Click "Start VM" to begin';
+                log('VM stopped successfully', 'success');
+            } catch (error) {
+                log(`Error stopping VM: ${error.message}`, 'error');
+            }
+        }
+
+        async function restartVM() {
+            log('Restarting VM...', 'info');
+            await stopVM();
+            setTimeout(() => startVM(), 1000);
+        }
+
+        async function saveState() {
+            if (!emulator) return;
+            
+            try {
+                log('Saving VM state...', 'info');
+                const state = await emulator.save_state();
+                
+                // Save disk image
+                await emulator.disk_images.hda.save_state(async (error, buffer) => {
+                    if (error) {
+                        log(`Error saving disk state: ${error}`, 'error');
+                        return;
+                    }
+                    
+                    await saveDiskState(buffer);
+                });
+                
+                log('State saved successfully', 'success');
+            } catch (error) {
+                log(`Error saving state: ${error.message}`, 'error');
+            }
+        }
+
+        function startAutoSave() {
+            const autoSaveEnabled = document.getElementById('autosave-toggle').checked;
+            if (!autoSaveEnabled) return;
+            
+            stopAutoSave();
+            autoSaveInterval = setInterval(() => {
+                if (emulator) {
+                    saveState();
+                }
+            }, 30000); // Save every 30 seconds
+            
+            log('Auto-save enabled (30s interval)', 'info');
+        }
+
+        function stopAutoSave() {
+            if (autoSaveInterval) {
+                clearInterval(autoSaveInterval);
+                autoSaveInterval = null;
+            }
+        }
+
+        function toggleFullscreen() {
+            const overlay = document.getElementById('fullscreen-overlay');
+            const screenContainer = document.getElementById('screen_container');
+            const fullscreenScreen = document.getElementById('fullscreen-screen');
+            
+            if (overlay.classList.contains('active')) {
+                overlay.classList.remove('active');
+                screenContainer.appendChild(document.querySelector('#screen_container canvas'));
+            } else {
+                overlay.classList.add('active');
+                fullscreenScreen.appendChild(document.querySelector('#screen_container canvas'));
+            }
+        }
+
+        function toggleKeyboard() {
+            if (!emulator) return;
+            
+            keyboardGrabbed = !keyboardGrabbed;
+            if (keyboardGrabbed) {
+                emulator.keyboard_set_status(true);
+                document.getElementById('btn-keyboard').textContent = '⌨️ Release Keyboard';
+                log('Keyboard grabbed - press ESC to release', 'info');
+            } else {
+                emulator.keyboard_set_status(false);
+                document.getElementById('btn-keyboard').textContent = '⌨️ Grab Keyboard';
+                log('Keyboard released', 'info');
+            }
+        }
+
+        function importFile() {
+            const files = document.getElementById('file-input').files;
+            if (!emulator || files.length === 0) return;
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    // Note: v86 doesn't have a direct filesystem API, 
+                    // files would need to be transferred via other means (serial, network, etc.)
+                    log(`File "${file.name}" read (${file.size} bytes)`, 'info');
+                    log('Note: File import requires additional setup in the VM', 'info');
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function exportFile() {
+            log('Export functionality requires 9P filesystem setup', 'info');
+            log('This is a placeholder for future implementation', 'info');
+        }
+
+        async function clearCache() {
+            if (confirm('Are you sure you want to clear all cached data? This will remove the downloaded ISO and saved disk state.')) {
+                try {
+                    const db = await openDB();
+                    const transaction = db.transaction(['osFiles', 'diskState'], 'readwrite');
+                    await transaction.objectStore('osFiles').clear();
+                    await transaction.objectStore('diskState').clear();
+                    log('Cache cleared successfully', 'success');
+                } catch (error) {
+                    log(`Error clearing cache: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function showCacheInfo() {
+            try {
+                const db = await openDB();
+                const isoData = await getCachedISO();
+                const diskData = await getDiskState();
+                
+                const isoSize = isoData ? (isoData.byteLength / 1024 / 1024).toFixed(2) : '0';
+                const diskSize = diskData ? (diskData.byteLength / 1024 / 1024).toFixed(2) : '0';
+                
+                log(`Cache Info: ISO: ${isoSize}MB, Disk State: ${diskSize}MB`, 'info');
+                alert(`Cache Information:\n\nISO File: ${isoSize} MB\nDisk State: ${diskSize} MB\nTotal: ${(parseFloat(isoSize) + parseFloat(diskSize)).toFixed(2)} MB`);
+            } catch (error) {
+                log(`Error getting cache info: ${error.message}`, 'error');
+            }
+        }
+
+        function updateMemoryDisplay() {
+            const value = document.getElementById('memory-slider').value;
+            document.getElementById('memory-display').textContent = `${value} MB`;
+        }
+
+        function updateStatus(text, isRunning) {
+            document.getElementById('status-text').textContent = text;
+            const indicator = document.getElementById('status-indicator');
+            if (isRunning) {
+                indicator.classList.add('running');
+            } else {
+                indicator.classList.remove('running');
+            }
+        }
+
+        function enableControls() {
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-stop').disabled = false;
+            document.getElementById('btn-restart').disabled = false;
+            document.getElementById('btn-save').disabled = false;
+            document.getElementById('btn-export').disabled = false;
+        }
+
+        function disableControls() {
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-stop').disabled = true;
+            document.getElementById('btn-restart').disabled = true;
+            document.getElementById('btn-save').disabled = true;
+            document.getElementById('btn-export').disabled = true;
+        }
+
+        function log(message, type = 'info') {
+            const terminal = document.getElementById('terminal');
+            const line = document.createElement('div');
+            line.className = `terminal-line ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            line.textContent = `[${timestamp}] ${message}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            // Keep only last 100 lines
+            while (terminal.children.length > 100) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+
+        function showProgress() {
+            document.getElementById('progress-container').style.display = 'block';
+        }
+
+        function hideProgress() {
+            document.getElementById('progress-container').style.display = 'none';
+        }
+
+        function updateProgress(percent) {
+            const bar = document.getElementById('progress-bar');
+            bar.style.width = percent + '%';
+            bar.textContent = percent + '%';
+        }
+
+        // Save state before closing
+        window.addEventListener('beforeunload', async (e) => {
+            if (emulator) {
+                await saveState();
+            }
+        });
+
+        // Initialize
+        log('SliTaz VM ready to start', 'success');
+        log('Click "Start VM" to boot SliTaz Linux', 'info');
+        log('First boot will download ~40MB ISO (cached for future use)', 'info');
+    </script>
+</body>
+</html>
