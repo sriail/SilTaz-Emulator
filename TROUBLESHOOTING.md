@@ -37,7 +37,7 @@ Test in incognito/private mode
    wget http://mirror.slitaz.org/iso/rolling/slitaz-rolling.iso
    ```
 2. Place in same directory as index.html
-3. Edit index.html line 317:
+3. Edit index.html line 453:
    ```javascript
    const ISO_URL = './slitaz-rolling.iso';
    ```
