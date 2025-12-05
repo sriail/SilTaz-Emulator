@@ -8,6 +8,7 @@ A full-featured **SliTaz Linux** virtual machine running directly in your web br
 - **Full Linux Environment**: Run complete SliTaz Linux distribution in your browser
 - **Persistent Storage**: Your files and changes are saved between sessions using IndexedDB
 - **Smart Caching**: Downloads the ~40MB ISO once, then loads instantly from cache
+- **Local ISO Upload**: Upload your own ISO file if automatic download fails (recommended for reliability)
 - **Network Support**: Optional network connectivity via WebSocket relay
 - **File Operations**: Import and export files between your computer and the VM
 
@@ -20,7 +21,8 @@ SliTaz includes many useful applications out of the box:
 - **System Tools**: Complete Linux toolchain
 
 ### UI Features
-- **Modern Interface**: Clean, responsive design that works on all devices
+- **Modern Interface**: Clean, unified color scheme with consistent design
+- **SVG Icons**: Professional icons throughout the interface
 - **Live Console**: Real-time status updates and system logs
 - **Fullscreen Mode**: Maximize your workspace
 - **Keyboard Grab**: Full keyboard control for the VM
@@ -85,11 +87,20 @@ npx vercel
 ## 📖 Usage Guide
 
 ### First Boot
+
+**Option 1: Automatic Download (Recommended for deployed sites)**
 1. Click the **"Start VM"** button
 2. Wait for the ~40MB SliTaz ISO to download (one-time only)
 3. The ISO is cached automatically for future use
 4. Watch the boot process in the screen area
 5. SliTaz will boot to a login prompt
+
+**Option 2: Local ISO File (Recommended if download fails)**
+1. Download SliTaz ISO manually from [slitaz.org](http://mirror.slitaz.org/iso/rolling/)
+2. Click **"Load Local ISO"** button in Settings
+3. Select the downloaded ISO file
+4. Click **"Start VM"** button
+5. SliTaz will boot from your local file
 
 ### Login Credentials
 - **Username**: `tux` (or `root` for admin)
@@ -292,10 +303,13 @@ hda: {
 - Disable browser extensions that might interfere
 
 ### ISO Download Fails
+- **NEW: Use Local ISO Feature** - Click "Load Local ISO" in Settings to upload your own ISO file
 - Check internet connection
 - Verify ISO URL is accessible
 - Try a different SliTaz mirror
 - Check browser's download restrictions
+- Disable ad blockers or content blockers
+- Try deploying to GitHub Pages, Netlify, or Vercel for better CORS handling
 
 ### Performance Issues
 - Reduce memory allocation in settings
