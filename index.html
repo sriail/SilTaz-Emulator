@@ -417,6 +417,16 @@
             <div class="settings-panel">
                 <h3><span class="icon"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</h3>
                 <div class="setting-row">
+                    <label>Use Local ISO File (recommended if download fails)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="file" id="local-iso-input" accept=".iso" style="display: none;" onchange="loadLocalISO()">
+                        <button class="btn btn-info" onclick="document.getElementById('local-iso-input').click()">
+                            <span class="icon"><svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg></span> Load Local ISO
+                        </button>
+                        <span id="local-iso-name" style="align-self: center; color: #666;"></span>
+                    </div>
+                </div>
+                <div class="setting-row">
                     <label for="memory-slider">Memory Allocation</label>
                     <div>
                         <input type="range" id="memory-slider" min="128" max="512" value="256" step="64" 
@@ -461,6 +471,7 @@
         let emulator = null;
         let autoSaveInterval = null;
         let keyboardGrabbed = false;
+        let localISOBuffer = null; // Store local ISO if user uploads one
         const DB_NAME = 'SliTazVM';
         const DB_VERSION = 1;
         const ISO_URL = 'https://mirror.slitaz.org/iso/rolling/slitaz-rolling.iso';
@@ -538,7 +549,38 @@
             });
         }
 
+        async function loadLocalISO() {
+            const fileInput = document.getElementById('local-iso-input');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            log(`Loading local ISO: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+            document.getElementById('local-iso-name').textContent = file.name;
+            
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    localISOBuffer = e.target.result;
+                    log('Local ISO loaded successfully!', 'success');
+                    log('You can now start the VM using this ISO', 'info');
+                    resolve();
+                };
+                reader.onerror = () => {
+                    log('Error reading local ISO file', 'error');
+                    reject(new Error('Failed to read ISO file'));
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
         async function fetchISO() {
+            // If user uploaded a local ISO, use that instead
+            if (localISOBuffer) {
+                log('Using local ISO file', 'success');
+                return localISOBuffer;
+            }
+            
             log('Checking for cached ISO...', 'info');
             let isoData = await getCachedISO();
             
@@ -578,7 +620,17 @@
                 
                 xhr.onerror = () => {
                     hideProgress();
-                    reject(new Error('Network error while downloading ISO'));
+                    log('Network error while downloading ISO', 'error');
+                    log('This may be caused by:', 'error');
+                    log('1. Browser blocking cross-origin requests (CORS)', 'error');
+                    log('2. Content blocker or ad blocker extension', 'error');
+                    log('3. Network connectivity issues', 'error');
+                    log('', 'info');
+                    log('Solutions:', 'info');
+                    log('1. Try disabling ad blocker/content blocker', 'info');
+                    log('2. Deploy to a proper hosting platform (GitHub Pages, Netlify, etc.)', 'info');
+                    log('3. Download ISO manually and host locally', 'info');
+                    reject(new Error('Network error while downloading ISO. See console for solutions.'));
                 };
                 
                 xhr.send();
@@ -620,7 +672,7 @@
                         async: false
                     },
                     autostart: true,
-                    boot_order: 0x132 // CD first, then floppy, then HDD - allows booting from CD-ROM
+                    boot_order: 0x123 // Try CD first (1), then HDD (2), then Floppy (3)
                 };
 
                 // Add network configuration if enabled
